@@ -15,7 +15,6 @@ COPY lib/api-spec/package.json ./lib/api-spec/
 COPY lib/api-zod/package.json ./lib/api-zod/
 COPY lib/api-client-react/package.json ./lib/api-client-react/
 COPY artifacts/api-server/package.json ./artifacts/api-server/
-COPY artifacts/mockup-sandbox/package.json ./artifacts/mockup-sandbox/
 
 # --ignore-scripts skips the workspace preinstall guard that blocks npm
 RUN pnpm install --frozen-lockfile --ignore-scripts
