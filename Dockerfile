@@ -1,11 +1,13 @@
-FROM node:22
+FROM node:22-slim
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm@10 --no-fund --no-audit
+# Disable corepack integrity key verification (required in Railway CI)
+ENV COREPACK_INTEGRITY_KEYS=0
 
-# Copy workspace manifests for layer caching
+RUN corepack enable && corepack prepare pnpm@10.26.1 --activate
+
+# Copy workspace manifests first for layer caching
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.json ./
 
 COPY lib/db/package.json ./lib/db/
@@ -15,7 +17,7 @@ COPY lib/api-client-react/package.json ./lib/api-client-react/
 COPY artifacts/api-server/package.json ./artifacts/api-server/
 COPY artifacts/mockup-sandbox/package.json ./artifacts/mockup-sandbox/
 
-# Install dependencies (--ignore-scripts skips the preinstall pnpm guard)
+# --ignore-scripts skips the workspace preinstall guard that blocks npm
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy full source
