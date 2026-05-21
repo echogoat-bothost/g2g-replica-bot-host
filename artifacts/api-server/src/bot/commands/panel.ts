@@ -17,7 +17,32 @@ import { logger } from "../../lib/logger";
 import { db, panelsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
+interface PanelConfig {
+  staffRoleId: string;
+  categoryId: string;
+  buttonLabel: string;
+  buttonEmoji: string;
+  questions: string[];
+}
+
+// In-memory cache — populated from DB on startup, updated on new panel creation.
+// Eliminates DB round-trips during button interactions (Discord requires <3s response).
+const panelCache = new Map<string, PanelConfig>();
 const pendingImages = new Map<string, string>();
+
+export async function loadPanelCache() {
+  const rows = await db.select().from(panelsTable);
+  for (const row of rows) {
+    panelCache.set(row.panelId, {
+      staffRoleId: row.staffRoleId,
+      categoryId: row.categoryId,
+      buttonLabel: row.buttonLabel,
+      buttonEmoji: row.buttonEmoji,
+      questions: JSON.parse(row.questions),
+    });
+  }
+  logger.info({ count: panelCache.size }, "Panel cache loaded from DB");
+}
 
 export async function handlePanelCreateCommand(
   interaction: ChatInputCommandInteraction
@@ -154,6 +179,9 @@ export async function handlePanelCreateModal(
     questions: JSON.stringify(questions),
   });
 
+  // Keep cache in sync so the button works immediately without a DB round-trip
+  panelCache.set(panelId, { staffRoleId, categoryId, buttonLabel, buttonEmoji: buttonEmojiRaw, questions });
+
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(button);
 
   await interaction.deferReply({ ephemeral: true });
@@ -167,13 +195,8 @@ export async function handlePanelTicketButton(
   const guild = interaction.guild;
   if (!guild) return;
 
-  const row = await db
-    .select()
-    .from(panelsTable)
-    .where(eq(panelsTable.panelId, interaction.customId))
-    .limit(1);
-
-  const config = row[0];
+  // Use cache — avoids DB round-trip that would exceed Discord's 3s interaction deadline
+  const config = panelCache.get(interaction.customId);
   if (!config) {
     await interaction.reply({
       content: "❌ Panel config not found. Please ask staff to re-create the panel.",
@@ -182,7 +205,7 @@ export async function handlePanelTicketButton(
     return;
   }
 
-  const questions: string[] = JSON.parse(config.questions);
+  const questions = config.questions;
 
   const existing = guild.channels.cache.find(
     (ch) =>
