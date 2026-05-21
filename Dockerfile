@@ -1,11 +1,11 @@
-FROM node:22-slim
+FROM node:22
 
 WORKDIR /app
 
-# Install pnpm globally
-RUN npm install -g pnpm@10.26.1
+# Install pnpm
+RUN npm install -g pnpm@10 --no-fund --no-audit
 
-# Copy workspace manifests first for dependency caching
+# Copy workspace manifests for layer caching
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.json ./
 
 COPY lib/db/package.json ./lib/db/
@@ -15,13 +15,13 @@ COPY lib/api-client-react/package.json ./lib/api-client-react/
 COPY artifacts/api-server/package.json ./artifacts/api-server/
 COPY artifacts/mockup-sandbox/package.json ./artifacts/mockup-sandbox/
 
-# Install all dependencies (ignore preinstall guard)
+# Install dependencies (--ignore-scripts skips the preinstall pnpm guard)
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy full source
 COPY . .
 
-# Build: compile libs then bundle api-server
+# Build libs then bundle the bot
 RUN pnpm run typecheck:libs
 RUN pnpm --filter @workspace/api-server run build
 
