@@ -10,6 +10,7 @@ import {
 import { logger } from "../lib/logger";
 import { handleInteraction } from "./interactions";
 import { PAYMENT_EMOJIS } from "./commands/automm-panel";
+import { loadPanelCache } from "./commands/panel";
 
 const commands = [
   new SlashCommandBuilder()
@@ -111,8 +112,11 @@ export function startBot() {
 
   const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-  client.once(Events.ClientReady, (c) => {
+  client.once(Events.ClientReady, async (c) => {
     logger.info({ tag: c.user.tag }, "Discord bot ready");
+    await loadPanelCache().catch((err) =>
+      logger.error({ err }, "Failed to load panel cache")
+    );
   });
 
   client.on(Events.InteractionCreate, handleInteraction);
